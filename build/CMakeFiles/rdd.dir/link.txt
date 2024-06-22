@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/rdd.dir/main.cpp.o -o rdd 

@@ -1,3 +1,0 @@
-/home/ubuntu/rdd/build/CMakeFiles/rdd.dir
-/home/ubuntu/rdd/build/CMakeFiles/edit_cache.dir
-/home/ubuntu/rdd/build/CMakeFiles/rebuild_cache.dir
