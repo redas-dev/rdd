@@ -16,7 +16,6 @@ public:
         const std::string nextToken = this->sourceCode.substr(position);
         for(auto&[fst, snd] : Tokens::TokenTypeRegex) {
             if (std::smatch match; std::regex_search(nextToken, match, snd)) {
-                //std::cout << match.str() << std::endl;
                 if (Tokens::WHITESPACE() != fst && Tokens::COMMENT() != fst) {
                     tokens.emplace_back(fst, match.str(), lineNum, Tokens::TYPENAME::GetType(match.str()));
                 }

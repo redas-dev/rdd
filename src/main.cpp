@@ -39,8 +39,6 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    //std::cout << prog << std::endl;
-
     {
         auto generator = Generator(root.value());
         std::string prog = generator.GenerateProg();

@@ -151,7 +151,7 @@ namespace Node {
 
     struct Function {
         std::string name;
-        std::vector<FunVar*> args;
+        std::vector<StmtVar*> args;
         std::string returnType;
         Scope* scope;
     };

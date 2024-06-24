@@ -325,7 +325,7 @@ class Generator {
 
             std::string var;
 
-            struct VarVisitor visitor {.generator = *this, .var = var};
+            VarVisitor visitor {.generator = *this, .var = var};
             std::visit(visitor, var_decl->var);
             return visitor.var;
         }
@@ -379,16 +379,10 @@ class Generator {
                         exit(EXIT_FAILURE);
                     }
 
-                    std::vector<Variable> args;
-
+                    std::vector<Node::StmtVar*> args;
                     for (const auto& arg : function->args) {
-                        args.push_back({
-                            .name = arg->ident.value,
-                            .stackLocation = generator.stackPointer,
-                            .type = arg->ident.varType.value()
-                        });
-
-                        generator.stackPointer++;
+                        generator.GenerateVarDecl(arg);
+                        args.push_back(arg);
                     }
 
                     generator.functions.push_back(Function {
@@ -418,13 +412,16 @@ class Generator {
                         exit(EXIT_FAILURE);
                     }
 
+                    generator.output << "    sub rsp, " << fun_call->args.size() * 8 << "\n";
+
                     for (size_t i = 0; i < fun_call->args.size(); i++) {
                         generator.GenerateExp(fun_call->args[i]);
                         generator.pop("rax");
-                        generator.output << "    mov QWORD [rsp + " << (generator.stackPointer + i) * 8 << "], rax\n";
+                        generator.output << "    mov QWORD [rsp + " << i * 8 << "], rax\n";
                     }
 
                     generator.output << "    call " << fun_call->name << "\n";
+                    generator.output << "    add rsp, " << fun_call->args.size() * 8 << "\n"; // Clean up the stack
                 }
 
                 void operator()(const Node::StmtWhile* while_) const {
@@ -584,7 +581,7 @@ class Generator {
 
         struct Function {
             std::string name;
-            std::vector<Variable> args;
+            std::vector<Node::StmtVar*> args;
             std::string returnType;
             Node::Scope* scope;
         };

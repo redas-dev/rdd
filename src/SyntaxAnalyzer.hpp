@@ -108,35 +108,28 @@ public:
             auto comp_exp = arena.allocate<Node::CompExp>();
             const auto _exp_lhs = arena.allocate<Node::Expr>();
 
-            if (op.type == Tokens::OPERATOR() && op.value == "+")
-            {
+            if (op.type == Tokens::OPERATOR() && op.value == "+"){
                 auto add = arena.allocate<Node::BinExpAdd>();
                 _exp_lhs->expr = lhs_exp->expr;
                 add->lhs = _exp_lhs;
                 add->rhs = exp_rhs.value();
                 exp->bin_exp = add;
                 lhs_exp->expr = exp;
-            }
-            else if (op.type == Tokens::OPERATOR() && op.value == "*")
-            {
+            } else if (op.type == Tokens::OPERATOR() && op.value == "*"){
                 auto multi = arena.allocate<Node::BinExpMulti>();
                 _exp_lhs->expr = lhs_exp->expr;
                 multi->lhs = _exp_lhs;
                 multi->rhs = exp_rhs.value();
                 exp->bin_exp = multi;
                 lhs_exp->expr = exp;
-            }
-            else if (op.type == Tokens::OPERATOR() && op.value == "/")
-            {
+            } else if (op.type == Tokens::OPERATOR() && op.value == "/"){
                 auto div = arena.allocate<Node::BinExpDiv>();
                 _exp_lhs->expr = lhs_exp->expr;
                 div->lhs = _exp_lhs;
                 div->rhs = exp_rhs.value();
                 exp->bin_exp = div;
                 lhs_exp->expr = exp;
-            }
-            else if (op.type == Tokens::OPERATOR() && op.value == "-")
-            {
+            } else if (op.type == Tokens::OPERATOR() && op.value == "-"){
                 auto sub = arena.allocate<Node::BinExpSub>();
                 _exp_lhs->expr = lhs_exp->expr;
                 sub->lhs = _exp_lhs;
@@ -269,23 +262,24 @@ public:
 
     std::optional<Node::StmtVar*> ParseVar(const bool funcVar = false) {
         if (const auto variable = TryConsume(Tokens::IDENTIFIER())){
-            if (TryConsume(Tokens::OPERATOR(), ":")){
+            if (TryConsume(Tokens::OPERATOR(), ":")){ // Declaration
                 const Token type = TryConsumeErr(Tokens::TYPENAME());
 
-                if (TryConsume(Tokens::OPERATOR(), "=")){
+                if (TryConsume(Tokens::OPERATOR(), "=")){  // Declaration with assignment
                     if (const auto expr = ParseExpr()){
 
                         auto var_decl = arena.allocate<Node::VarDecl>();
 
                         var_decl->ident = variable.value();
 
-                        if (type.varType.value() == Tokens::TYPENAME::INT) {
+                        // No clue why this was here
+                        /*if (type.varType.value() == Tokens::TYPENAME::INT) {
                             var_decl->ident.varType = Tokens::TYPENAME::INT;
                         } else if (type.varType.value() == Tokens::TYPENAME::CHAR) {
                             var_decl->ident.varType = Tokens::TYPENAME::CHAR;
                         } else if (type.varType.value() == Tokens::TYPENAME::STRING) {
                             var_decl->ident.varType = Tokens::TYPENAME::STRING;
-                        }
+                        }*/
 
                         var_decl->ident.varType = type.varType.value();
                         var_decl->expr = expr.value();
@@ -297,7 +291,7 @@ public:
                     }
                     ErrorExpected("expression", Peek(-1).value().lineNum);
                 }
-                else if (Peek().has_value() && Peek().value().type == Tokens::DELIMITER() && Peek().value().value == ";"){
+                else if (Peek().has_value() && Peek().value().type == Tokens::DELIMITER() && Peek().value().value == ";"){  // Declaration without assignment
                     auto var_decl = arena.allocate<Node::VarDecl>();
                     var_decl->ident = variable.value();
                     var_decl->expr = nullptr;
@@ -307,10 +301,11 @@ public:
 
                     return stmt_var;
                 }
-                else if (funcVar) {
+                else if (funcVar) { // Variable declarations in functions
                     auto var_decl = arena.allocate<Node::FunVar>();
                     var_decl->ident = variable.value();
                     var_decl->expr = nullptr;
+                    var_decl->ident.varType = type.varType.value();
 
                     auto stmt_var = arena.allocate<Node::StmtVar>();
                     stmt_var->var = var_decl;
@@ -321,7 +316,7 @@ public:
                     ErrorExpected("= or ;", Peek(-1).value().lineNum);
                 }
             }
-            else if (TryConsume(Tokens::OPERATOR(), "=")){
+            else if (TryConsume(Tokens::OPERATOR(), "=")){ // Assignment
                 if (const auto expr = ParseExpr()){
                     auto var_decl = arena.allocate<Node::VarAssign>();
                     var_decl->ident = variable.value();
@@ -383,9 +378,9 @@ public:
 
             TryConsumeErr(Tokens::DELIMITER(), "(");
 
-            while (const auto stmt = ParseVar(true)) {
-                if (auto funVar = std::get_if<Node::FunVar*>(&stmt.value()->var)) {
-                    stmt_fun->args.push_back(*funVar);
+            while (auto stmt = ParseVar(true)) {
+                if (stmt.has_value() && std::get_if<Node::FunVar*>(&stmt.value()->var)) {
+                    stmt_fun->args.push_back(stmt.value());
                 }
                 TryConsume(Tokens::DELIMITER(), ",");
             }
@@ -449,14 +444,14 @@ public:
             } else ErrorExpected("expression", Peek(-1).value().lineNum);
         }
         else if (Peek().value().type == Tokens::IDENTIFIER()) {
-            if (Peek().value().type == Tokens::IDENTIFIER() && Peek(1).value().type == Tokens::OPERATOR() && Peek(1).value().value == ":") {
+            if (Peek(1).value().type == Tokens::OPERATOR() && (Peek(1).value().value == ":" || Peek(1).value().value == "=")) {
                 auto var = ParseVar();
                 TryConsumeErr(Tokens::DELIMITER(), ";");
                 auto stmt = arena.allocate<Node::Stmt>();
                 stmt->stmt = var.value();
                 return stmt;
             }
-            if (Peek().value().type == Tokens::IDENTIFIER() && Peek(1).value().type == Tokens::DELIMITER() && Peek(1).value().value == "(") {
+            if (Peek(1).value().type == Tokens::DELIMITER() && Peek(1).value().value == "(") {
                 const auto funCall = TryConsume(Tokens::IDENTIFIER());
                 if (TryConsume(Tokens::DELIMITER(), "(")) {
                     std::vector<Node::Expr*> args;
