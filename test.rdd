@@ -1,8 +1,8 @@
-fun test(x: int): int {
+/*fun test(x: int): int {
     exit(x);
 }
 
-test(10);
+test(10);*/
 
 x: int = 0;
 

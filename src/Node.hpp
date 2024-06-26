@@ -12,13 +12,14 @@ namespace Node {
     struct Stmt;
     struct IFPred;
 
-    template <typename T>
+    //template <typename T>
     struct BinaryExpression {
-        Expr* lhs;
-        Expr* rhs;
+        Expr* lhs {};
+        Expr* rhs {};
+        std::string sign;
     };
 
-    using CompExpEq = BinaryExpression<struct Eq>;
+    /*using CompExpEq = BinaryExpression<struct Eq>;
     using CompExpNeq = BinaryExpression<struct Neq>;
     using CompExpGt = BinaryExpression<struct Gt>;
     using CompExpGte = BinaryExpression<struct Gte>;
@@ -31,7 +32,7 @@ namespace Node {
 
     struct CompExp {
         CompExpVariant comp_exp;
-    };
+    };*/
 
     struct Scope {
         std::vector<Stmt*> stmts;
@@ -80,7 +81,7 @@ namespace Node {
         Token string_lit;
     };
 
-    using BinExpAdd = BinaryExpression<struct Add>;
+    /*using BinExpAdd = BinaryExpression<struct Add>;
     using BinExpMulti = BinaryExpression<struct Multi>;
     using BinExpSub = BinaryExpression<struct Sub>;
     using BinExpDiv = BinaryExpression<struct Div>;
@@ -89,7 +90,7 @@ namespace Node {
 
     struct BinExp {
         BinExpVariant bin_exp;
-    };
+    };*/
 
     using TermVariant = std::variant<TermIntLit*, TermIdent*, TermParen*, TermStringLit*>;
 
@@ -97,7 +98,7 @@ namespace Node {
         TermVariant term;
     };
 
-    using ExprVariant = std::variant<Term*, BinExp*, CompExp*>;
+    using ExprVariant = std::variant<Term*, BinaryExpression*/*BinExp*, CompExp**/>;
 
     struct Expr {
         ExprVariant expr;

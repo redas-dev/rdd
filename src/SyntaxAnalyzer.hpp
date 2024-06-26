@@ -104,97 +104,14 @@ public:
             if (!exp_rhs.has_value())
                 ErrorExpected("expression", Peek(-1).value().lineNum);
 
-            auto exp = arena.allocate<Node::BinExp>();
-            auto comp_exp = arena.allocate<Node::CompExp>();
+            const auto exp = arena.allocate<Node::BinaryExpression>();
             const auto _exp_lhs = arena.allocate<Node::Expr>();
 
-            if (op.type == Tokens::OPERATOR() && op.value == "+"){
-                auto add = arena.allocate<Node::BinExpAdd>();
-                _exp_lhs->expr = lhs_exp->expr;
-                add->lhs = _exp_lhs;
-                add->rhs = exp_rhs.value();
-                exp->bin_exp = add;
-                lhs_exp->expr = exp;
-            } else if (op.type == Tokens::OPERATOR() && op.value == "*"){
-                auto multi = arena.allocate<Node::BinExpMulti>();
-                _exp_lhs->expr = lhs_exp->expr;
-                multi->lhs = _exp_lhs;
-                multi->rhs = exp_rhs.value();
-                exp->bin_exp = multi;
-                lhs_exp->expr = exp;
-            } else if (op.type == Tokens::OPERATOR() && op.value == "/"){
-                auto div = arena.allocate<Node::BinExpDiv>();
-                _exp_lhs->expr = lhs_exp->expr;
-                div->lhs = _exp_lhs;
-                div->rhs = exp_rhs.value();
-                exp->bin_exp = div;
-                lhs_exp->expr = exp;
-            } else if (op.type == Tokens::OPERATOR() && op.value == "-"){
-                auto sub = arena.allocate<Node::BinExpSub>();
-                _exp_lhs->expr = lhs_exp->expr;
-                sub->lhs = _exp_lhs;
-                sub->rhs = exp_rhs.value();
-                exp->bin_exp = sub;
-                lhs_exp->expr = exp;
-            } else if (op.type == Tokens::OPERATOR() && op.value == "<") {
-                auto less = arena.allocate<Node::CompExpLt>();
-                _exp_lhs->expr = lhs_exp->expr;
-                less->lhs = _exp_lhs;
-                less->rhs = exp_rhs.value();
-                comp_exp->comp_exp = less;
-                lhs_exp->expr = comp_exp;
-            } else if (op.type == Tokens::OPERATOR() && op.value == ">") {
-                auto greater = arena.allocate<Node::CompExpGt>();
-                _exp_lhs->expr = lhs_exp->expr;
-                greater->lhs = _exp_lhs;
-                greater->rhs = exp_rhs.value();
-                comp_exp->comp_exp = greater;
-                lhs_exp->expr = comp_exp;
-            } else if (op.type == Tokens::OPERATOR() && op.value == "==") {
-                auto equal = arena.allocate<Node::CompExpEq>();
-                _exp_lhs->expr = lhs_exp->expr;
-                equal->lhs = _exp_lhs;
-                equal->rhs = exp_rhs.value();
-                comp_exp->comp_exp = equal;
-                lhs_exp->expr = comp_exp;
-            } else if (op.type == Tokens::OPERATOR() && op.value == "!=") {
-                auto not_equal = arena.allocate<Node::CompExpNeq>();
-                _exp_lhs->expr = lhs_exp->expr;
-                not_equal->lhs = _exp_lhs;
-                not_equal->rhs = exp_rhs.value();
-                comp_exp->comp_exp = not_equal;
-                lhs_exp->expr = comp_exp;
-            } else if (op.type == Tokens::OPERATOR() && op.value == "<=") {
-                auto less_equal = arena.allocate<Node::CompExpLte>();
-                _exp_lhs->expr = lhs_exp->expr;
-                less_equal->lhs = _exp_lhs;
-                less_equal->rhs = exp_rhs.value();
-                comp_exp->comp_exp = less_equal;
-                lhs_exp->expr = comp_exp;
-            } else if (op.type == Tokens::OPERATOR() && op.value == ">=") {
-                auto greater_equal = arena.allocate<Node::CompExpGte>();
-                _exp_lhs->expr = lhs_exp->expr;
-                greater_equal->lhs = _exp_lhs;
-                greater_equal->rhs = exp_rhs.value();
-                comp_exp->comp_exp = greater_equal;
-                lhs_exp->expr = comp_exp;
-            } else if (op.type == Tokens::OPERATOR() && op.value == "||") {
-                auto or_exp = arena.allocate<Node::CompExpOr>();
-                _exp_lhs->expr = lhs_exp->expr;
-                or_exp->lhs = _exp_lhs;
-                or_exp->rhs = exp_rhs.value();
-                comp_exp->comp_exp = or_exp;
-                lhs_exp->expr = comp_exp;
-            } else if (op.type == Tokens::OPERATOR() && op.value == "&&") {
-                auto and_exp = arena.allocate<Node::CompExpAnd>();
-                _exp_lhs->expr = lhs_exp->expr;
-                and_exp->lhs = _exp_lhs;
-                and_exp->rhs = exp_rhs.value();
-                comp_exp->comp_exp = and_exp;
-                lhs_exp->expr = comp_exp;
-            }
-            else 
-                ErrorExpected("operator", Peek(-1).value().lineNum);
+            _exp_lhs->expr = lhs_exp->expr;
+            exp->lhs = _exp_lhs;
+            exp->rhs = exp_rhs.value();
+            exp->sign = op.value;
+            lhs_exp->expr = exp;
         }
 
         return lhs_exp;

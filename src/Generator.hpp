@@ -17,158 +17,52 @@ class Generator {
                 {
                     generator.GenerateTerm(term);
                 }
-                void operator()(const Node::CompExp* comp) const {
-                    if (std::holds_alternative<Node::CompExpEq*>(comp->comp_exp)) {
-                        const Node::CompExpEq* eq = std::get<Node::CompExpEq*>(comp->comp_exp);
+                void operator()(const Node::BinaryExpression* binExp) const {
+                    generator.GenerateExp(binExp->rhs);
+                    generator.GenerateExp(binExp->lhs);
+                    generator.pop("rax");
+                    generator.pop("rbx");
 
-                        generator.GenerateExp(eq->rhs);
-                        generator.GenerateExp(eq->lhs);
-
-                        generator.pop("rax");
-                        generator.pop("rbx");
-
+                    if (binExp->sign == "==") {
                         generator.output << "    cmp rax, rbx\n";
                         generator.output << "    sete al\n";
                         generator.output << "    movzx rax, al\n";
-                        generator.push("rax");
-                    } else if (std::holds_alternative<Node::CompExpNeq*>(comp->comp_exp)) {
-                        const Node::CompExpNeq* neq = std::get<Node::CompExpNeq*>(comp->comp_exp);
-
-                        generator.GenerateExp(neq->rhs);
-                        generator.GenerateExp(neq->lhs);
-
-                        generator.pop("rax");
-                        generator.pop("rbx");
-
+                    } else if (binExp->sign == "!=") {
                         generator.output << "    cmp rax, rbx\n";
                         generator.output << "    setne al\n";
                         generator.output << "    movzx rax, al\n";
-                        generator.push("rax");
-                    } else if (std::holds_alternative<Node::CompExpGt*>(comp->comp_exp)) {
-                        const Node::CompExpGt* gt = std::get<Node::CompExpGt*>(comp->comp_exp);
-
-                        generator.GenerateExp(gt->rhs);
-                        generator.GenerateExp(gt->lhs);
-
-                        generator.pop("rax");
-                        generator.pop("rbx");
-
+                    } else if (binExp->sign == ">") {
                         generator.output << "    cmp rax, rbx\n";
                         generator.output << "    setg al\n";
                         generator.output << "    movzx rax, al\n";
-                        generator.push("rax");
-                    } else if (std::holds_alternative<Node::CompExpGte*>(comp->comp_exp)) {
-                        const Node::CompExpGte* gte = std::get<Node::CompExpGte*>(comp->comp_exp);
-
-                        generator.GenerateExp(gte->rhs);
-                        generator.GenerateExp(gte->lhs);
-
-                        generator.pop("rax");
-                        generator.pop("rbx");
-
+                    } else if (binExp->sign == ">=") {
                         generator.output << "    cmp rax, rbx\n";
                         generator.output << "    setge al\n";
                         generator.output << "    movzx rax, al\n";
-                        generator.push("rax");
-                    } else if (std::holds_alternative<Node::CompExpLt*>(comp->comp_exp)) {
-                        const Node::CompExpLt* lt = std::get<Node::CompExpLt*>(comp->comp_exp);
-
-                        generator.GenerateExp(lt->rhs);
-                        generator.GenerateExp(lt->lhs);
-
-                        generator.pop("rax");
-                        generator.pop("rbx");
-
+                    } else if (binExp->sign == "<") {
                         generator.output << "    cmp rax, rbx\n";
                         generator.output << "    setl al\n";
                         generator.output << "    movzx rax, al\n";
-                        generator.push("rax");
-                    } else if (std::holds_alternative<Node::CompExpLte*>(comp->comp_exp)) {
-                        const Node::CompExpLte* lte = std::get<Node::CompExpLte*>(comp->comp_exp);
-
-                        generator.GenerateExp(lte->rhs);
-                        generator.GenerateExp(lte->lhs);
-
-                        generator.pop("rax");
-                        generator.pop("rbx");
-
+                    } else if (binExp->sign == "<=") {
                         generator.output << "    cmp rax, rbx\n";
                         generator.output << "    setle al\n";
                         generator.output << "    movzx rax, al\n";
-                        generator.push("rax");
-                    } else if (std::holds_alternative<Node::CompExpAnd*>(comp->comp_exp)) {
-                        const Node::CompExpAnd* and_ = std::get<Node::CompExpAnd*>(comp->comp_exp);
-
-                        generator.GenerateExp(and_->rhs);
-                        generator.GenerateExp(and_->lhs);
-
-                        generator.pop("rax");
-                        generator.pop("rbx");
-
+                    } else if (binExp->sign == "&&") {
                         generator.output << "    and rax, rbx\n";
-                        generator.push("rax");
-                    } else if (std::holds_alternative<Node::CompExpOr*>(comp->comp_exp)) {
-                        const Node::CompExpOr* or_ = std::get<Node::CompExpOr*>(comp->comp_exp);
-
-                        generator.GenerateExp(or_->rhs);
-                        generator.GenerateExp(or_->lhs);
-
-                        generator.pop("rax");
-                        generator.pop("rbx");
-
+                    } else if (binExp->sign == "||") {
                         generator.output << "    or rax, rbx\n";
-                        generator.push("rax");
-                    }
-                }
-                void operator()(const Node::BinExp* bin) const {
-                    if (std::holds_alternative<Node::BinExpAdd*>(bin->bin_exp)) {
-                        const Node::BinExpAdd* add = std::get<Node::BinExpAdd*>(bin->bin_exp);
-
-                        generator.GenerateExp(add->rhs);
-                        generator.GenerateExp(add->lhs);
-
-                        generator.pop("rax");
-                        generator.pop("rbx");
-
+                    } else if (binExp->sign == "+") {
                         generator.output << "    add rax, rbx\n";
-                        generator.push("rax");
-
-                    } else if (std::holds_alternative<Node::BinExpMulti*>(bin->bin_exp)) {
-                        const Node::BinExpMulti* multi = std::get<Node::BinExpMulti*>(bin->bin_exp);
-
-                        generator.GenerateExp(multi->rhs);
-                        generator.GenerateExp(multi->lhs);
-
-                        generator.pop("rax");
-                        generator.pop("rbx");
-
+                    } else if (binExp->sign == "*") {
                         generator.output << "    imul rax, rbx\n";
-                        generator.push("rax");
-                    } else if (std::holds_alternative<Node::BinExpDiv*>(bin->bin_exp))
-                    {
-                        const Node::BinExpDiv* div = std::get<Node::BinExpDiv*>(bin->bin_exp);
-
-                        generator.GenerateExp(div->rhs);
-                        generator.GenerateExp(div->lhs);
-
-                        generator.pop("rax");
-                        generator.pop("rbx");
-
+                    } else if (binExp->sign == "/") {
                         generator.output << "    cqo\n";
                         generator.output << "    idiv rbx\n";
-                        generator.push("rax");
-                    } else if (std::holds_alternative<Node::BinExpSub*>(bin->bin_exp)) {
-                        const Node::BinExpSub* sub = std::get<Node::BinExpSub*>(bin->bin_exp);
-
-                        generator.GenerateExp(sub->rhs);
-                        generator.GenerateExp(sub->lhs);
-
-                        generator.pop("rax");
-                        generator.pop("rbx");
-
+                    } else if (binExp->sign == "-") {
                         generator.output << "    sub rax, rbx\n";
-                        generator.push("rax");
-                    }
+                    } else exit(EXIT_FAILURE);
+
+                    generator.push("rax");
                 }
             };
 
@@ -395,6 +289,8 @@ class Generator {
                     generator.output << function->name << ":\n";
                     generator.GenerateScope(function->scope);
 
+                    generator.output << "    ret\n";
+
                     generator.end_scope();
                 }
 
@@ -421,7 +317,7 @@ class Generator {
                     }
 
                     generator.output << "    call " << fun_call->name << "\n";
-                    generator.output << "    add rsp, " << fun_call->args.size() * 8 << "\n"; // Clean up the stack
+                    generator.output << "    add rsp, " << fun_call->args.size() * 8 << "\n";
                 }
 
                 void operator()(const Node::StmtWhile* while_) const {
