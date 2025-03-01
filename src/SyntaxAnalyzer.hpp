@@ -11,7 +11,7 @@
 
 inline std::optional<int> Precedence(const Token& token)
 {
-    if (token.value == "<" || token.value == ">" || token.value == "==" || token.value == "!=" || token.value == "<=" || token.value == ">=" || token.value == "||" || token.value == "&&")
+    if (token.value == "<" || token.value == ">" || token.value == "==" || token.value == "!=" || token.value == "<=" || token.value == ">=" || token.value == "||" || token.value == "&&" | token.value == "&" || token.value == "|")
         return 0;
     if (token.value == "*" || token.value == "/")
         return 2;
@@ -117,7 +117,7 @@ public:
         return lhs_exp;
     }
 
-    std::optional<Node::Scope*> ParseScope() // NOLINT(*-no-recursion)
+    std::optional<Node::Scope*> ParseScope(const bool functionScope = false, const bool isVoid = false) // NOLINT(*-no-recursion)
     {
         TryConsumeErr(Tokens::DELIMITER(), "{");
 
@@ -125,6 +125,14 @@ public:
         while (auto stmt = ParseStmt())
         {
             scope->stmts.push_back(stmt.value());
+        }
+
+        if (functionScope && !isVoid)
+        {
+            if (scope->stmts.empty() || !std::holds_alternative<Node::StmtReturn*>(scope->stmts.back()->stmt))
+            {
+                ErrorExpected("return statement", Peek(-1).value().lineNum);
+            }
         }
 
         TryConsumeErr(Tokens::DELIMITER(), "}");
@@ -184,20 +192,8 @@ public:
 
                 if (TryConsume(Tokens::OPERATOR(), "=")){  // Declaration with assignment
                     if (const auto expr = ParseExpr()){
-
                         auto var_decl = arena.allocate<Node::VarDecl>();
-
                         var_decl->ident = variable.value();
-
-                        // No clue why this was here
-                        /*if (type.varType.value() == Tokens::TYPENAME::INT) {
-                            var_decl->ident.varType = Tokens::TYPENAME::INT;
-                        } else if (type.varType.value() == Tokens::TYPENAME::CHAR) {
-                            var_decl->ident.varType = Tokens::TYPENAME::CHAR;
-                        } else if (type.varType.value() == Tokens::TYPENAME::STRING) {
-                            var_decl->ident.varType = Tokens::TYPENAME::STRING;
-                        }*/
-
                         var_decl->ident.varType = type.varType.value();
                         var_decl->expr = expr.value();
 
@@ -206,12 +202,12 @@ public:
 
                         return stmt_var;
                     }
-                    ErrorExpected("expression", Peek(-1).value().lineNum);
                 }
-                else if (Peek().has_value() && Peek().value().type == Tokens::DELIMITER() && Peek().value().value == ";"){  // Declaration without assignment
+                else if (TryPeek(Tokens::DELIMITER(), ";")){  // Declaration without assignment
                     auto var_decl = arena.allocate<Node::VarDecl>();
                     var_decl->ident = variable.value();
                     var_decl->expr = nullptr;
+                    var_decl->ident.varType = type.varType.value();
 
                     auto stmt_var = arena.allocate<Node::StmtVar>();
                     stmt_var->var = var_decl;
@@ -272,48 +268,6 @@ public:
             } 
             ErrorExpected("expression", Peek(-1).value().lineNum);
         }
-        else if (TryConsume(Tokens::KEYWORD(), "return")) {
-             if (const auto expr = ParseExpr()) {
-                 TryConsumeErr(Tokens::DELIMITER(), ";");
-
-                 auto stmt_return = arena.allocate<Node::StmtReturn>();
-                 stmt_return->expr = expr.value();
-
-                 auto stmt = arena.allocate<Node::Stmt>();
-                 stmt->stmt = stmt_return;
-
-                 return stmt;
-             }
-             ErrorExpected("expression", Peek(-1).value().lineNum);
-        }
-        else if (TryConsume(Tokens::KEYWORD(), "fun")) {
-            auto stmt_fun = arena.allocate<Node::Function>();
-
-            const auto var = TryConsume(Tokens::IDENTIFIER());
-
-            stmt_fun->name = var.value().value;
-
-            TryConsumeErr(Tokens::DELIMITER(), "(");
-
-            while (auto stmt = ParseVar(true)) {
-                if (stmt.has_value() && std::get_if<Node::FunVar*>(&stmt.value()->var)) {
-                    stmt_fun->args.push_back(stmt.value());
-                }
-                TryConsume(Tokens::DELIMITER(), ",");
-            }
-            TryConsumeErr(Tokens::DELIMITER(), ")");
-            TryConsumeErr(Tokens::OPERATOR(), ":");
-            if (const auto type = TryConsume(Tokens::TYPENAME())) {
-                stmt_fun->returnType = type.value().value;
-            }
-
-            if (const auto scope = ParseScope()) {
-                stmt_fun->scope = scope.value();
-                auto stmt = arena.allocate<Node::Stmt>();
-                stmt->stmt = stmt_fun;
-                return stmt;
-            }
-        }
         else if (TryConsume(Tokens::KEYWORD(), "while")) {
             if (const auto exp = ParseExpr()) {
                 if (const auto scope = ParseScope()) {
@@ -360,49 +314,24 @@ public:
                 }
             } else ErrorExpected("expression", Peek(-1).value().lineNum);
         }
-        else if (Peek().value().type == Tokens::IDENTIFIER()) {
-            if (Peek(1).value().type == Tokens::OPERATOR() && (Peek(1).value().value == ":" || Peek(1).value().value == "=")) {
+        else if (TryPeek(Tokens::IDENTIFIER())) {
+            if (TryPeek(Tokens::OPERATOR(), ":", 1) || TryPeek(Tokens::OPERATOR(), "=", 1)) {
                 auto var = ParseVar();
                 TryConsumeErr(Tokens::DELIMITER(), ";");
                 auto stmt = arena.allocate<Node::Stmt>();
                 stmt->stmt = var.value();
                 return stmt;
             }
-            if (Peek(1).value().type == Tokens::DELIMITER() && Peek(1).value().value == "(") {
-                const auto funCall = TryConsume(Tokens::IDENTIFIER());
-                if (TryConsume(Tokens::DELIMITER(), "(")) {
-                    std::vector<Node::Expr*> args;
-                    while (const auto expr = ParseExpr()) {
-                        args.push_back(expr.value());
-                        if (TryConsume(Tokens::DELIMITER(), ",")) {
-                            continue;
-                        }
-                        break;
-                    }
-                    TryConsumeErr(Tokens::DELIMITER(), ")");
-                    TryConsumeErr(Tokens::DELIMITER(), ";");
 
-                    auto stmt_fun_call = arena.allocate<Node::FunCall>();
-                    stmt_fun_call->name = funCall.value().value;
-                    stmt_fun_call->args = args;
-
-                    auto stmt = arena.allocate<Node::Stmt>();
-                    stmt->stmt = stmt_fun_call;
-
-                    return stmt;
-                }
-                ErrorExpected("function call", Peek(-1).value().lineNum);
-            }
-
-            ErrorExpected("function call or variable declaration", Peek(-1).value().lineNum);
+            ErrorExpected("variable declaration", Peek(-1).value().lineNum);
         }
         else if (TryConsume(Tokens::KEYWORD(), "print")){
             TryConsumeErr(Tokens::DELIMITER(), "(");
-            if (const auto exp = ParseExpr())
-            {
+            auto stmt_print = arena.allocate<Node::StmtPrint>();
+            if (const auto exp = ParseExpr()){
                 TryConsumeErr(Tokens::DELIMITER(), ")");
                 TryConsumeErr(Tokens::DELIMITER(), ";");
-                auto stmt_print = arena.allocate<Node::StmtPrint>();
+
                 stmt_print->exp = exp.value();
 
                 auto stmt = arena.allocate<Node::Stmt>();
@@ -410,9 +339,10 @@ public:
 
                 return stmt;
             }
+
             ErrorExpected("expression", Peek(-1).value().lineNum);
         }
-        else if (Peek().value().type == Tokens::DELIMITER() && Peek().value().value == "{")
+        else if (TryPeek(Tokens::DELIMITER(), "{"))
         {
             if (auto scope = ParseScope())
             {
@@ -483,10 +413,21 @@ private:
         return tokens[index++];
     }
 
-     static void ErrorExpected(const std::string& msg, const int line)
+    void ErrorExpected(const std::string& msg, const int line)
     {
         std::cerr << "[Parser error]: Expected " << msg << " on line " << line << std::endl;
+
         exit(EXIT_FAILURE);
+    }
+
+    template <typename T> bool TryPeek(T type, int offset = 0)
+    {
+        return Peek(offset).has_value() && Peek(offset).value().type == type;
+    }
+
+    template <typename T> bool TryPeek(T type, const std::string& val, int offset = 0)
+    {
+        return Peek(offset).has_value() && Peek(offset).value().type == type && Peek(offset).value().value == val;
     }
 
     template <typename T> Token TryConsumeErr(T type)

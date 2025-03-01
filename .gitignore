@@ -31,6 +31,6 @@
 *.out
 *.app
 *.asm
-/build
+src/build
 /.idea
 /.vscode

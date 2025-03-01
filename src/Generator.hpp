@@ -2,6 +2,11 @@
 
 #include <cassert>
 #include <vector>
+#include <sstream>
+#include <algorithm>
+#include <iostream>
+#include <string>
+#include <optional>
 
 #include "SyntaxAnalyzer.hpp"
 
@@ -18,10 +23,57 @@ class Generator {
                     generator.GenerateTerm(term);
                 }
                 void operator()(const Node::BinaryExpression* binExp) const {
-                    generator.GenerateExp(binExp->rhs);
+                    // For logical operators, use short-circuit evaluation
+                    if (binExp->sign == "&&") {
+                        const std::string false_label = generator.CreateLabel();
+                        const std::string end_label = generator.CreateLabel();
+
+                        generator.GenerateExp(binExp->lhs);
+                        generator.pop("rax");
+                        generator.output << "    test rax, rax\n";
+                        generator.output << "    je " << false_label << "\n";
+                        
+                        generator.GenerateExp(binExp->rhs);
+                        generator.pop("rax");
+                        generator.output << "    test rax, rax\n";
+                        generator.output << "    je " << false_label << "\n";
+                        
+                        generator.output << "    mov rax, 1\n";
+                        generator.output << "    jmp " << end_label << "\n";
+                        generator.output << false_label << ":\n";
+                        generator.output << "    mov rax, 0\n";
+                        generator.output << end_label << ":\n";
+                        generator.push("rax");
+                        return;
+                    } 
+                    else if (binExp->sign == "||") {
+                        const std::string true_label = generator.CreateLabel();
+                        const std::string end_label = generator.CreateLabel();
+
+                        generator.GenerateExp(binExp->lhs);
+                        generator.pop("rax");
+                        generator.output << "    test rax, rax\n";
+                        generator.output << "    jne " << true_label << "\n";
+                        
+                        generator.GenerateExp(binExp->rhs);
+                        generator.pop("rax");
+                        generator.output << "    test rax, rax\n";
+                        generator.output << "    jne " << true_label << "\n";
+                        
+                        generator.output << "    mov rax, 0\n";
+                        generator.output << "    jmp " << end_label << "\n";
+                        generator.output << true_label << ":\n";
+                        generator.output << "    mov rax, 1\n";
+                        generator.output << end_label << ":\n";
+                        generator.push("rax");
+                        return;
+                    }
+
+                    // For non-logical operators
                     generator.GenerateExp(binExp->lhs);
-                    generator.pop("rax");
-                    generator.pop("rbx");
+                    generator.GenerateExp(binExp->rhs);
+                    generator.pop("rbx");  // rhs in rbx
+                    generator.pop("rax");  // lhs in rax
 
                     if (binExp->sign == "==") {
                         generator.output << "    cmp rax, rbx\n";
@@ -47,9 +99,9 @@ class Generator {
                         generator.output << "    cmp rax, rbx\n";
                         generator.output << "    setle al\n";
                         generator.output << "    movzx rax, al\n";
-                    } else if (binExp->sign == "&&") {
+                    } else if (binExp->sign == "&") {
                         generator.output << "    and rax, rbx\n";
-                    } else if (binExp->sign == "||") {
+                    } else if (binExp->sign == "|") {
                         generator.output << "    or rax, rbx\n";
                     } else if (binExp->sign == "+") {
                         generator.output << "    add rax, rbx\n";
@@ -60,7 +112,10 @@ class Generator {
                         generator.output << "    idiv rbx\n";
                     } else if (binExp->sign == "-") {
                         generator.output << "    sub rax, rbx\n";
-                    } else exit(EXIT_FAILURE);
+                    } else {
+                        std::cerr << "Error: Unknown binary operator: " << binExp->sign << std::endl;
+                        exit(EXIT_FAILURE);
+                    }
 
                     generator.push("rax");
                 }
@@ -88,24 +143,30 @@ class Generator {
 
                 void operator()(const Node::TermStringLit* term_string_lit) const {
                     generator.output << ";; TermStringLit\n";
-                    const std::string label = "str_" + std::to_string(generator.stringCounter++);
-                    generator.strings.push_back({term_string_lit->string_lit.value, label});
-                    generator.output << "     mov edx, " << label << "Len\n";
-                    generator.output << "     mov ecx, " << label << "\n";
+                    std::string label = generator.CreateStringLabel();
+                    generator.stringLiterals.push_back({label, term_string_lit->string_lit.value});
+                    generator.output << "    lea rax, [" << label << "]\n";
+                    generator.push("rax");
                 }
 
                 void operator()(const Node::TermIdent* term_ident) const {
-                    generator.output << ";; TermIdent\n";
-                    const auto variable = std::ranges::find_if(generator.variables, [&](const auto& var) { return var.name == term_ident->ident.value; });
+                    auto variable = std::find_if(
+                        generator.variables.cbegin(),
+                        generator.variables.cend(),
+                        [&term_ident](const Generator::Variable& var) {
+                            return var.name == term_ident->ident.value;
+                        }
+                    );
 
                     if (variable == generator.variables.cend()) {
-                        std::cerr << "Error: Variable " << term_ident->ident.value << " not declared" << std::endl;
+                        std::cerr << "Error: Variable " << term_ident->ident.value << " not found" << std::endl;
                         exit(EXIT_FAILURE);
                     }
 
-                    generator.push(
-                        "QWORD [rsp + " + std::to_string((generator.stackPointer - variable->stackLocation - 1) * 8)
-                        + "]");
+                    size_t offset = (generator.stackPointer - variable->stackLocation - 1) * 8;
+                    generator.output << "    ; Accessing global variable " << variable->name << " at [rsp+" << offset << "]\n";
+                    generator.push("QWORD [rsp + " + std::to_string(offset) + "]");
+                    
                 }
 
                 void operator()(const Node::TermParen* term_paren) const {
@@ -199,21 +260,7 @@ class Generator {
                 }
 
                 void operator()(const Node::FunVar* fun_var) const {
-                    generator.output << ";; FunVar\n";
-                    const auto variable = std::ranges::find_if(generator.variables, [&](const auto& var) { return var.name == fun_var->ident.value; });
-                    if (variable != generator.variables.cend())
-                    {
-                        std::cerr << "Error: Variable " << fun_var->ident.value << " already declared" << std::endl;
-                        exit(EXIT_FAILURE);
-                    }
-
-                    generator.variables.push_back({
-                        .name = fun_var->ident.value,
-                        .stackLocation = generator.stackPointer,
-                        .type = fun_var->ident.varType.value()
-                    });
-
-                    var = fun_var->ident.value;
+                    assert(false); // TODO
                 }
             };
 
@@ -255,86 +302,32 @@ class Generator {
                 }
 
                 void operator()(const Node::StmtReturn* return_) const {
-                    generator.output << ";; Return\n";
-                    generator.GenerateExp(return_->expr);
-                    generator.output << "    mov rsp, rbp\n";
-                    generator.output << "    pop rbp\n";
-                    generator.output << "    ret\n";
+                    assert(false); // TODO
                 }
 
                 void operator()(const Node::Function* function) const {
-                    generator.begin_scope();
-                    generator.output << ";; Function\n";
-
-                    const auto function_ = std::ranges::find_if(generator.functions, [&](const auto& f) { return f.name == function->name; });
-
-                    if (function_ != generator.functions.cend()) {
-                        std::cerr << "Error: Function " << function->name << " already declared" << std::endl;
-                        exit(EXIT_FAILURE);
-                    }
-
-                    std::vector<Node::StmtVar*> args;
-                    for (const auto& arg : function->args) {
-                        generator.GenerateVarDecl(arg);
-                        args.push_back(arg);
-                    }
-
-                    generator.functions.push_back(Function {
-                        .name = function->name,
-                        .args = args,
-                        .returnType = function->returnType,
-                        .scope = function->scope
-                    });
-
-                    generator.output << function->name << ":\n";
-                    generator.GenerateScope(function->scope);
-
-                    generator.output << "    ret\n";
-
-                    generator.end_scope();
+                    assert(false); // TODO
                 }
 
                 void operator()(const Node::FunCall* fun_call) const {
-                    generator.output << ";; FunCall\n";
-                    const auto function = std::ranges::find_if(generator.functions, [&](const auto& f) { return f.name == fun_call->name; });
-
-                    if (function == generator.functions.cend()) {
-                        std::cerr << "Error: Function " << fun_call->name << " not declared" << std::endl;
-                        exit(EXIT_FAILURE);
-                    }
-
-                    if (fun_call->args.size() != function->args.size()) {
-                        std::cerr << "Error: Function " << fun_call->name << " expected " << function->args.size() << " arguments, got " << fun_call->args.size() << std::endl;
-                        exit(EXIT_FAILURE);
-                    }
-
-                    generator.output << "    sub rsp, " << fun_call->args.size() * 8 << "\n";
-
-                    for (size_t i = 0; i < fun_call->args.size(); i++) {
-                        generator.GenerateExp(fun_call->args[i]);
-                        generator.pop("rax");
-                        generator.output << "    mov QWORD [rsp + " << i * 8 << "], rax\n";
-                    }
-
-                    generator.output << "    call " << fun_call->name << "\n";
-                    generator.output << "    add rsp, " << fun_call->args.size() * 8 << "\n";
+                    assert(false); // TODO
                 }
 
                 void operator()(const Node::StmtWhile* while_) const {
                     generator.output << ";; While\n";
-
                     generator.GenerateLoop(while_->condition, while_->scope);
                 }
 
                 void operator()(const Node::StmtFor* for_) const {
                     generator.output << ";; For\n";
                     std::string var = generator.GenerateVarDecl(for_->init);
-
                     generator.GenerateLoop(for_->condition, for_->scope, for_->increment);
-
-                    auto variable = std::ranges::find_if(generator.variables, [&](const auto& v) { return v.name == var; });
-                    if (variable != generator.variables.cend())
-                    {
+                    
+                    // Clean up the variable
+                    auto variable = std::ranges::find_if(generator.variables, [&](const auto& v) { 
+                        return v.name == var; 
+                    });
+                    if (variable != generator.variables.cend()) {
                         generator.variables.pop_back();
                     }
                 }
@@ -346,14 +339,101 @@ class Generator {
 
                 void operator()(const Node::StmtPrint* print) const
                 {
-                    /*generator.output << ";; Print\n";
-
+                    generator.output << ";; StmtPrint\n";
                     generator.GenerateExp(print->exp);
+                    generator.pop("rax");  // Value to print is now in rax
 
-                    generator.output << "    mov ebx, 1\n";
-                    generator.output << "    mov eax, 4\n";
-                    generator.output << "    int 0x80\n";*/
-                    assert(false);
+                    std::string baseLabel = generator.CreateLabel();
+                    
+                    // Try to determine if we're printing a string or an integer
+                    // This is a simple heuristic - a better solution would track types through the AST
+                    generator.output << "    ; Check if we're printing a string or integer\n";
+                    generator.output << "    ; Strings typically have high addresses, numbers are typically small\n";
+                    generator.output << "    cmp rax, 0x1000000\n";
+                    generator.output << "    jae .print_as_string_" << baseLabel << "\n";
+                    
+                    // Print as integer
+                    generator.output << "    ; Print as integer\n";
+                    generator.output << "    mov rdi, rax\n"; // Save the value to print
+                    
+                    // Check if negative
+                    generator.output << "    cmp rdi, 0\n";
+                    generator.output << "    jge .print_positive_" << baseLabel << "\n";
+                    generator.output << "    mov byte [print_buffer], '-'\n";
+                    generator.output << "    mov rsi, 1\n"; // Number of characters written (the '-')
+                    generator.output << "    neg rdi\n"; // Make rdi positive
+                    generator.output << "    jmp .print_convert_" << baseLabel << "\n";
+
+                    generator.output << ".print_positive_" << baseLabel << ":\n";
+                    generator.output << "    mov rsi, 0\n"; // No '-' sign
+
+                    generator.output << ".print_convert_" << baseLabel << ":\n";
+                    generator.output << "    mov rax, rdi\n"; // rax = number
+                    generator.output << "    mov rcx, 10\n"; // divisor
+                    generator.output << "    xor rbx, rbx\n"; // counter for digits
+
+                    generator.output << ".print_loop_" << baseLabel << ":\n";
+                    generator.output << "    xor rdx, rdx\n";
+                    generator.output << "    div rcx\n"; // rax = quotient, rdx = remainder
+                    generator.output << "    add dl, '0'\n"; // convert to ASCII
+                    generator.output << "    push rdx\n"; // push the digit
+                    generator.output << "    inc rbx\n"; // increment digit count
+                    generator.output << "    test rax, rax\n";
+                    generator.output << "    jnz .print_loop_" << baseLabel << "\n";
+
+                    // Now, pop digits into the buffer
+                    generator.output << "    mov rcx, rbx\n"; // number of digits
+                    generator.output << "    lea rdi, [print_buffer + rsi]\n"; // buffer position after '-' if any
+
+                    generator.output << ".print_store_" << baseLabel << ":\n";
+                    generator.output << "    pop rax\n"; // get the digit
+                    generator.output << "    mov [rdi], al\n"; // store the byte
+                    generator.output << "    inc rdi\n";
+                    generator.output << "    loop .print_store_" << baseLabel << "\n";
+
+                    // Calculate total length: rbx (digits) + rsi (sign)
+                    generator.output << "    add rbx, rsi\n";
+                    generator.output << "    mov rdx, rbx\n"; // length
+
+                    // sys_write syscall
+                    generator.output << "    mov rax, 1\n"; // syscall 1: write
+                    generator.output << "    mov rdi, 1\n"; // fd 1 (stdout)
+                    generator.output << "    lea rsi, [print_buffer]\n";
+                    generator.output << "    syscall\n";
+                    
+                    // Print newline and return
+                    generator.output << "    jmp .print_newline_" << baseLabel << "\n";
+                    
+                    // String printing logic
+                    generator.output << ".print_as_string_" << baseLabel << ":\n";
+                    generator.output << "    ; Print as string\n";
+                    generator.output << "    mov rsi, rax\n";  // String pointer is in rax
+                    generator.output << "    mov rdx, 0\n";    // Initialize length counter
+
+                    // Safely calculate string length with a maximum to prevent potential issues
+                    generator.output << "    mov rcx, 1024\n"; // Maximum string length to check
+                    generator.output << ".strlen_loop_" << baseLabel << ":\n";
+                    generator.output << "    cmp byte [rsi + rdx], 0\n";
+                    generator.output << "    je .strlen_done_" << baseLabel << "\n";
+                    generator.output << "    inc rdx\n";
+                    generator.output << "    dec rcx\n";
+                    generator.output << "    jz .strlen_done_" << baseLabel << "\n"; // Safety check
+                    generator.output << "    jmp .strlen_loop_" << baseLabel << "\n";
+
+                    generator.output << ".strlen_done_" << baseLabel << ":\n";
+                    generator.output << "    test rdx, rdx\n";
+                    generator.output << "    jz .print_newline_" << baseLabel << "\n"; // Skip empty string
+                    generator.output << "    mov rax, 1\n";    // syscall: write
+                    generator.output << "    mov rdi, 1\n";    // file descriptor: stdout
+                    generator.output << "    syscall\n";
+                    
+                    // Print newline for both integer and string
+                    generator.output << ".print_newline_" << baseLabel << ":\n";
+                    generator.output << "    mov rax, 1\n";
+                    generator.output << "    mov rdi, 1\n";
+                    generator.output << "    lea rsi, [newline]\n";
+                    generator.output << "    mov rdx, 1\n";
+                    generator.output << "    syscall\n";
                 }
 
                 void operator()(const Node::Scope* scope) const
@@ -403,35 +483,30 @@ class Generator {
         }
 
         std::string GenerateProg() {
-            output << "%macro print 1 ; macro with one argument\n push dword %1 ; %1 means first argument\ncall printf\nadd  esp, 4\n%endmacro\n";
+            output << "section .data\n";
+            output << "newline db 0xA\n";
+            
+            // Generate string literals
+            for (const auto& strLit : stringLiterals) {
+                output << strLit.label << " db \"" << strLit.value << "\", 0\n";
+            }
+            
             output << "section .bss\n";
+            output << "print_buffer resb 32\n"; // Buffer for integer printing (increased size)
+            
             output << "section .text\n";
-            output << "    global _start\n    extern printf\n_start:\n";
-
-            for(const Node::Stmt* stmt : root->stmts) {
+            output << "    global _start\n_start:\n";
+            
+            for (const Node::Stmt* stmt : root->stmts) {
                 GenerateStmt(stmt);
             }
-
+            
+            // Add default exit
             output << "    mov rax, 60\n";
             output << "    xor rdi, rdi\n";
             output << "    syscall\n";
-
-            output << "section .data\n";
-            output << "    format_int: db \"%d\", 0\n";
-            output << "    format_string: db \"%s\", 0\n";
-            output << "    format_float: db \"%f\", 0\n";
-            for(const auto& str : strings) {
-                output << "    " << str.label << ": db " << str.value << ", 0xA\n";
-                output << "    " << str.label << "Len: equ $-" << str.label << "\n";
-            }
-
+            
             return output.str();
-        }
-
-        std::string CreateLabel() {
-            std::stringstream ss;
-            ss << "label" << labelCounter++;
-            return ss.str();
         }
     private:
         void push(const std::string& reg) {
@@ -470,26 +545,30 @@ class Generator {
             Tokens::TYPENAME::Types type;
         };
 
-        struct Strings {
-            std::string value;
+        struct StringLiteral {
             std::string label;
-        };
-
-        struct Function {
-            std::string name;
-            std::vector<Node::StmtVar*> args;
-            std::string returnType;
-            Node::Scope* scope;
+            std::string value;
         };
 
         std::vector<Variable> variables {};
         std::vector<size_t> scopes {};
-        std::vector<Strings> strings {};
-        std::vector<Function> functions {};
+        std::vector<StringLiteral> stringLiterals;
 
         Node::Prog* root;
         std::stringstream output;
         size_t stackPointer = 0;
         int labelCounter = 0;
         int stringCounter = 0;
+
+        std::string CreateLabel() {
+            std::stringstream ss;
+            ss << "label" << labelCounter++;
+            return ss.str();
+        }
+    
+        std::string CreateStringLabel() {
+            std::stringstream ss;
+            ss << "L.str." << stringCounter++;
+            return ss.str();
+        }
 };

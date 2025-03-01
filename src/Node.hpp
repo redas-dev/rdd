@@ -12,27 +12,11 @@ namespace Node {
     struct Stmt;
     struct IFPred;
 
-    //template <typename T>
     struct BinaryExpression {
         Expr* lhs {};
         Expr* rhs {};
         std::string sign;
     };
-
-    /*using CompExpEq = BinaryExpression<struct Eq>;
-    using CompExpNeq = BinaryExpression<struct Neq>;
-    using CompExpGt = BinaryExpression<struct Gt>;
-    using CompExpGte = BinaryExpression<struct Gte>;
-    using CompExpLt = BinaryExpression<struct Lt>;
-    using CompExpLte = BinaryExpression<struct Lte>;
-    using CompExpAnd = BinaryExpression<struct And>;
-    using CompExpOr = BinaryExpression<struct Or>;
-
-    using CompExpVariant = std::variant<CompExpEq*, CompExpNeq*, CompExpGt*, CompExpGte*, CompExpLt*, CompExpLte*, CompExpAnd*, CompExpOr*>;
-
-    struct CompExp {
-        CompExpVariant comp_exp;
-    };*/
 
     struct Scope {
         std::vector<Stmt*> stmts;
@@ -81,24 +65,13 @@ namespace Node {
         Token string_lit;
     };
 
-    /*using BinExpAdd = BinaryExpression<struct Add>;
-    using BinExpMulti = BinaryExpression<struct Multi>;
-    using BinExpSub = BinaryExpression<struct Sub>;
-    using BinExpDiv = BinaryExpression<struct Div>;
-
-    using BinExpVariant = std::variant<BinExpAdd*, BinExpMulti*, BinExpSub*, BinExpDiv*>;
-
-    struct BinExp {
-        BinExpVariant bin_exp;
-    };*/
-
     using TermVariant = std::variant<TermIntLit*, TermIdent*, TermParen*, TermStringLit*>;
 
     struct Term {
         TermVariant term;
     };
 
-    using ExprVariant = std::variant<Term*, BinaryExpression*/*BinExp*, CompExp**/>;
+    using ExprVariant = std::variant<Term*, BinaryExpression*>;
 
     struct Expr {
         ExprVariant expr;
@@ -121,6 +94,10 @@ namespace Node {
     struct FunVar {
         Expr* expr;
         Token ident;
+    };
+
+    struct StmtReturn {
+        Expr* expr;
     };
 
     struct FunCall {
@@ -146,15 +123,12 @@ namespace Node {
         Scope* scope;
     };
 
-    struct StmtReturn {
-        Expr* expr;
-    };
-
     struct Function {
         std::string name;
         std::vector<StmtVar*> args;
         std::string returnType;
         Scope* scope;
+        StmtReturn* result;
     };
 
     using StmtVariant = std::variant<StmtExit*, StmtPrint*, Scope*, IF*, StmtVar*, StmtFor*, StmtWhile*, StmtReturn*, Function*, FunCall*>;

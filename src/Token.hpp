@@ -51,11 +51,15 @@ namespace Tokens {
         };
 
         [[nodiscard]]std::regex regex() const override {
-            return std::regex("^(void|if|else if|else|while|from|to|return|break|print|exit|by|fun)");
+            return std::regex("^(if|else if|else|while|from|to|return|break|print|exit|by|fun)");
         }
 
         bool operator ==(const Token* other){
             return typeid(*this) == typeid(*other);
+        }
+
+        bool operator!=(const Token* other) {
+            return typeid(*this) != typeid(*other);
         }
     };
 
@@ -85,16 +89,21 @@ namespace Tokens {
                 return BOOL;
             if (str == "string")
                 return STRING;
-
+            if (str == "void")
+                return VOID;
             return {};
         }
 
         [[nodiscard]] std::regex regex() const override {
-            return std::regex("^(int|float|char|string|bool)");
+            return std::regex("^(int|float|char|string|bool|void)");
         }
 
         bool operator==(const Token* other) {
             return typeid(*this) == typeid(*other);
+        }
+
+        bool operator!=(const Token* other) {
+            return typeid(*this) != typeid(*other);
         }
     };
 
@@ -106,11 +115,15 @@ namespace Tokens {
         std::string value{};
 
         [[nodiscard]] std::regex regex() const override {
-            return std::regex(R"(^(;|\(|\)|\{|\}))");
+            return std::regex("^(;|\\(|\\)|\\{|\\})");
         }
         
         bool operator==(const Token* other) {
             return typeid(*this) == typeid(*other);
+        }
+
+        bool operator!=(const Token* other) {
+            return typeid(*this) != typeid(*other);
         }
     };
 
@@ -123,6 +136,10 @@ namespace Tokens {
         bool operator==(const Token* other) {
             return typeid(*this) == typeid(*other);
         }
+
+        bool operator!=(const Token* other) {
+            return typeid(*this) != typeid(*other);
+        }
     };
 
     class NUMBER final: public Token {
@@ -133,6 +150,10 @@ namespace Tokens {
 
         bool operator==(const Token* other) {
             return typeid(*this) == typeid(*other);
+        }
+
+        bool operator!=(const Token* other) {
+            return typeid(*this) != typeid(*other);
         }
     };
 
@@ -145,6 +166,10 @@ namespace Tokens {
         bool operator==(const Token* other) {
             return typeid(*this) == typeid(*other);
         }
+
+        bool operator!=(const Token* other) {
+            return typeid(*this) != typeid(*other);
+        }
     };
 
     class STRING final: public Token {
@@ -156,16 +181,25 @@ namespace Tokens {
         bool operator==(const Token* other) {
             return typeid(*this) == typeid(*other);
         }
+
+        bool operator!=(const Token* other) {
+            return typeid(*this) != typeid(*other);
+        }
     };
 
     class IDENTIFIER final: public Token {
         public:
+        explicit IDENTIFIER() = default;
         [[nodiscard]] std::regex regex() const override {
             return std::regex("^[a-zA-Z_][a-zA-Z0-9_]*");
         }
 
         bool operator==(const Token* other) {
             return typeid(*this) == typeid(*other);
+        }
+
+        bool operator!=(const Token* other) {
+            return typeid(*this) != typeid(*other);
         }
     };
 
@@ -174,23 +208,32 @@ namespace Tokens {
         explicit OPERATOR(std::string value): value(std::move(value)) {}
         explicit OPERATOR() = default;
         std::string value{};
+
         [[nodiscard]] std::regex regex() const override {
-            return std::regex(R"(^(\+|-|\*|\/|={1,2}|:|<=|>=|<|>|\|{2}|&{2}|!=))");
+            return std::regex("^(\\+|-|\\*|\\/|={1,2}|:|<=|>=|<|>|\\|{1,2}|&{1,2}|!=)");
         }
 
         bool operator==(const Token* other) {
             return typeid(*this) == typeid(*other);
+        }
+
+        bool operator!=(const Token* other) {
+            return typeid(*this) != typeid(*other);
         }
     };
 
     class COMMENT final: public Token {
         public:
         [[nodiscard]] std::regex regex() const override {
-            return std::regex(R"(^(//.*)|^(/\*[\s\S]*\*/)|^(/\*[\s\S]*))");
+            return std::regex("^(//.*)|^(/\\*[\\s\\S]*\\*/)|^(/\\*[\\s\\S]*)");
         }
 
         bool operator==(const Token* other) {
             return typeid(*this) == typeid(*other);
+        }
+
+        bool operator!=(const Token* other) {
+            return typeid(*this) != typeid(*other);
         }
     };
 
