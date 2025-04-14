@@ -257,7 +257,7 @@ namespace Tokens {
     }
 
     inline bool operator!=(const Token* token, const Token& type) {
-        return !(token == type);
+        return typeid(*token) != typeid(type);
     }
 }
 
