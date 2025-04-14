@@ -250,6 +250,15 @@ namespace Tokens {
         {new IDENTIFIER(), IDENTIFIER().regex()},
         {new OPERATOR(), OPERATOR().regex()},
     };
+
+    // Add a generic operator== to compare Tokens::Token* with specific token types
+    inline bool operator==(const Token* token, const Token& type) {
+        return typeid(*token) == typeid(type);
+    }
+
+    inline bool operator!=(const Token* token, const Token& type) {
+        return !(token == type);
+    }
 }
 
 class Token {
